@@ -1,2 +1,2 @@
 # Reinagalerij
- An image viewer with webbased filemanager
+ An image viewer with web based filemanager
