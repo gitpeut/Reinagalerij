@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Reinagalerij</title>
+
+	<!--- script src="/tree.min.js"---><!---/script--->
+	<!---link rel="stylesheet" href="/treejs.css" id="treejs_styles"--->
+	
+    <!--- include treejs.min.js in html file --->
+
+<script>
+function TreeView(a,b,c){function d(g){var h=document.createElement("li"),j=document.createElement("span");if(j.className="tj_description",j.tj_node=g,g.isEnabled()||(h.setAttribute("disabled",""),g.setExpanded(!1),g.setSelected(!1)),g.isSelected()&&j.classList.add("selected"),j.addEventListener("click",function(n){for(var o=n.target;"undefined"==typeof o.tj_node||o.classList.contains("tj_container");)o=o.parentElement;var p=o.tj_node;if("undefined"!=typeof p&&p.isEnabled())if(!1==n.ctrlKey&&(p.isLeaf()?p.open():(p.toggleExpanded(),f.reload()),p.on("click")(n,p)),!0==n.ctrlKey)p.toggleSelected(),f.reload();else{var q=p.getRoot();q instanceof TreeNode&&TreeUtil.getSelectedNodesForNode(q).forEach(function(r){r.setSelected(!1)}),p.setSelected(!0),f.reload()}}),j.addEventListener("contextmenu",function(n){for(var o=n.target;"undefined"==typeof o.tj_node||o.classList.contains("tj_container");)o=o.parentElement;var p=o.tj_node;"undefined"==typeof p||("undefined"==typeof p.getListener("contextmenu")?"function"==typeof TreeConfig.context_menu&&(TreeConfig.context_menu(n,p),n.preventDefault()):(p.on("contextmenu")(n,p),n.preventDefault()))}),g.isLeaf()){var k="",l=TreeUtil.getProperty(g.getOptions(),"icon","");k+=""==l?""==(l=TreeUtil.getProperty(c,"leaf_icon",""))?"<span class=\"tj_icon\">"+TreeConfig.leaf_icon+"</span>":"<span class=\"tj_icon\">"+l+"</span>":"<span class=\"tj_icon\">"+l+"</span>",j.innerHTML=k+g.toString()+"</span>",j.classList.add("tj_leaf"),h.appendChild(j)}else{var k="";k+=g.isExpanded()?"<span class=\"tj_mod_icon\">"+TreeConfig.open_icon+"</span>":"<span class=\"tj_mod_icon\">"+TreeConfig.close_icon+"</span>";var l=TreeUtil.getProperty(g.getOptions(),"icon","");if(k+=""==l?""==(l=TreeUtil.getProperty(c,"parent_icon",""))?"<span class=\"tj_icon\">"+TreeConfig.parent_icon+"</span>":"<span class=\"tj_icon\">"+l+"</span>":"<span class=\"tj_icon\">"+l+"</span>",j.innerHTML=k+g.toString()+"</span>",h.appendChild(j),g.isExpanded()){var m=document.createElement("ul");g.getChildren().forEach(function(n){m.appendChild(d(n))}),h.appendChild(m)}}return h}var f=this;if("undefined"==typeof a)throw new Error("Parameter 1 must be set (root)");if(!(a instanceof TreeNode))throw new Error("Parameter 1 must be of type TreeNode");if(!b)b=null;else if(!TreeUtil.isDOM(b)&&(b=document.querySelector(b),b instanceof Array&&(b=b[0]),!TreeUtil.isDOM(b)))throw new Error("Parameter 2 must be either DOM-Object or CSS-QuerySelector (#, .)");c&&"object"==typeof c||(c={}),this.setRoot=function(g){a instanceof TreeNode&&(a=g)},this.getRoot=function(){return a},this.expandAllNodes=function(){a.setExpanded(!0),a.getChildren().forEach(function(g){TreeUtil.expandNode(g)})},this.expandPath=function(g){if(!(g instanceof TreePath))throw new Error("Parameter 1 must be of type TreePath");g.getPath().forEach(function(h){h.setExpanded(!0)})},this.collapseAllNodes=function(){a.setExpanded(!1),a.getChildren().forEach(function(g){TreeUtil.collapseNode(g)})},this.setContainer=function(g){if(TreeUtil.isDOM(g))b=g;else if(g=document.querySelector(g),g instanceof Array&&(g=g[0]),!TreeUtil.isDOM(g))throw new Error("Parameter 1 must be either DOM-Object or CSS-QuerySelector (#, .)")},this.getContainer=function(){return b},this.setOptions=function(g){"object"==typeof g&&(c=g)},this.changeOption=function(g,h){c[g]=h},this.getOptions=function(){return c},this.getSelectedNodes=function(){return TreeUtil.getSelectedNodesForNode(a)},this.reload=function(){if(null==b)return void console.warn("No container specified");b.classList.add("tj_container");var g=document.createElement("ul");g.appendChild(d(a)),b.innerHTML="",b.appendChild(g)},"undefined"!=typeof b&&this.reload()}function TreeNode(a,b){var c=[],d=this,f=[],g=!0,h=!0,j=!1;if(!a)a="";else if("string"!=typeof a||"function"!=typeof a.toString)throw new Error("Parameter 1 must be of type String or Object, where it must have the function toString()");b&&"object"==typeof b?(g=TreeUtil.getProperty(b,"expanded",!0),h=TreeUtil.getProperty(b,"enabled",!0),j=TreeUtil.getProperty(b,"selected",!1)):b={},this.addChild=function(k){if(!TreeUtil.getProperty(b,"allowsChildren",!0))return void console.warn("Option allowsChildren is set to false, no child added");if(k instanceof TreeNode)c.push(k),Object.defineProperty(k,"parent",{value:this,writable:!1,enumerable:!0,configurable:!0});else throw new Error("Parameter 1 must be of type TreeNode")},this.removeChildPos=function(k){"undefined"!=typeof c[k]&&"undefined"!=typeof c[k]&&c.splice(k,1)},this.removeChild=function(k){if(!(k instanceof TreeNode))throw new Error("Parameter 1 must be of type TreeNode");this.removeChildPos(this.getIndexOfChild(k))},this.getChildren=function(){return c},this.getChildCount=function(){return c.length},this.getIndexOfChild=function(k){for(var l=0;l<c.length;l++)if(c[l].equals(k))return l;return-1},this.getRoot=function(){for(var k=this;"undefined"!=typeof k.parent;)k=k.parent;return k},this.setUserObject=function(k){if("string"!=typeof k||"function"!=typeof k.toString)throw new Error("Parameter 1 must be of type String or Object, where it must have the function toString()");else a=k},this.getUserObject=function(){return a},this.setOptions=function(k){"object"==typeof k&&(b=k)},this.changeOption=function(k,l){b[k]=l},this.getOptions=function(){return b},this.isLeaf=function(){return 0==c.length},this.setExpanded=function(k){if(!this.isLeaf()&&"boolean"==typeof k){if(g==k)return;g=k,k?this.on("expand")(this):this.on("collapse")(this),this.on("toggle_expanded")(this)}},this.toggleExpanded=function(){g?this.setExpanded(!1):this.setExpanded(!0)},this.isExpanded=function(){return!!this.isLeaf()||g},this.setEnabled=function(k){if("boolean"==typeof k){if(h==k)return;h=k,k?this.on("enable")(this):this.on("disable")(this),this.on("toggle_enabled")(this)}},this.toggleEnabled=function(){h?this.setEnabled(!1):this.setEnabled(!0)},this.isEnabled=function(){return h},this.setSelected=function(k){"boolean"!=typeof k||j==k||(j=k,k?this.on("select")(this):this.on("deselect")(this),this.on("toggle_selected")(this))},this.toggleSelected=function(){j?this.setSelected(!1):this.setSelected(!0)},this.isSelected=function(){return j},this.open=function(){this.isLeaf()||this.on("open")(this)},this.on=function(k,l){if("undefined"==typeof l)return"function"==typeof f[k]?f[k]:function(){};if("function"!=typeof l)throw new Error("Argument 2 must be of type function");f[k]=l},this.getListener=function(k){return f[k]},this.equals=function(k){return k instanceof TreeNode&&k.getUserObject()==a},this.toString=function(){return"string"==typeof a?a:a.toString()}}function TreePath(a,b){var c=[];this.setPath=function(d,f){for(c=[];"undefined"!=typeof f&&!f.equals(d);)c.push(f),f=f.parent;if(f.equals(d))c.push(d);else throw c=[],new Error("Node is not contained in the tree of root");return c=c.reverse(),c},this.getPath=function(){return c},this.toString=function(){return c.join(" - ")},a instanceof TreeNode&&b instanceof TreeNode&&this.setPath(a,b)}const TreeUtil={default_leaf_icon:"<span>&#128441;</span>",default_parent_icon:"<span>&#128449;</span>",default_open_icon:"<span>&#9698;</span>",default_close_icon:"<span>&#9654;</span>",isDOM:function(a){try{return a instanceof HTMLElement}catch(b){return"object"==typeof a&&1===a.nodeType&&"object"==typeof a.style&&"object"==typeof a.ownerDocument}},getProperty:function(a,b,c){return"undefined"==typeof a[b]?c:a[b]},expandNode:function(a){a.setExpanded(!0),a.isLeaf()||a.getChildren().forEach(function(b){TreeUtil.expandNode(b)})},collapseNode:function(a){a.setExpanded(!1),a.isLeaf()||a.getChildren().forEach(function(b){TreeUtil.collapseNode(b)})},getSelectedNodesForNode:function(a){if(!(a instanceof TreeNode))throw new Error("Parameter 1 must be of type TreeNode");var b=[];return a.isSelected()&&b.push(a),a.getChildren().forEach(function(c){c.isSelected()&&-1==b.indexOf(c)&&b.push(c),c.isLeaf()||TreeUtil.getSelectedNodesForNode(c).forEach(function(d){-1==b.indexOf(d)&&b.push(d)})}),b}};var TreeConfig={leaf_icon:TreeUtil.default_leaf_icon,parent_icon:TreeUtil.default_parent_icon,open_icon:TreeUtil.default_open_icon,close_icon:TreeUtil.default_close_icon,context_menu:void 0};
+</script>
+
+<style>
+ 
+ /* include treejs.css in html file */
+ 
+        ul {
+            list-style-type: none;
+        }
+
+        .tj_container *{
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .tj_container ul{
+            padding-left: 2em;
+            list-style-type: none;
+        }
+
+        .tj_container > ul:first-of-type{
+            padding: 0;
+        }
+
+        .tj_container li span.tj_description{
+            cursor: pointer;
+            padding: 2px 5px;
+            display: block;
+            border-radius: 2px;
+
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        .tj_container li span.tj_description:hover{
+            background-color: #ccc;
+        }
+
+        .tj_container li span.tj_mod_icon, .tj_container li span.tj_icon{
+            margin-right: 0.5em;
+            display: inline-block;
+        }
+
+        .tj_container li span.tj_mod_icon, .tj_container li span.tj_mod_icon *{
+            width: 1em;
+        }
+
+        .tj_container li span.tj_description.tj_leaf{
+            margin-left: 1.5em;
+        }
+
+        .tj_container li[disabled=""]{
+            color: #b5b5b5;
+        }
+
+        .tj_container li[disabled=""]:hover span.tj_description{
+            cursor: default;
+            background-color: inherit;
+        }
+
+        .tj_container span.tj_description.selected{
+            background-color: #2b2b2b;
+            color: #fff;
+        }
+
+        .tj_container span.tj_description.selected:hover{
+            background-color: #606060;
+        }
+
+/*--- end of treejs.css */
+
+		*{
+			box-sizing: border-box;
+			position: relative;
+		}
+
+		body{
+			padding: 0;
+			margin: 0;
+			font-family: sans-serif;
+            font-size: 20px;
+		}
+
+        header img{
+            display: block;
+            width: 100px;
+           
+            margin: auto;
+        }
+        header{
+            width: 100%;
+            height: 80px;
+            background: green;
+            margin-bottom: 40px;
+        }
+
+		main{
+			margin: 0 1em;
+			
+		}
+
+
+
+		
+        #fscontainer{
+			width: 80%;
+			border: 1px solid #ccc;
+			margin: 0;
+			margin-bottom: 1em;
+		}
+
+
+		#description{
+			margin-top: 1em;
+		}
+
+		a{
+			color: #0085fc;
+		}
+
+
+   /*preview*/
+
+        .edit {
+          display: none; /* Hidden by default */
+          position: fixed; /* Stay in place */
+          z-index: 3; /* Sit on top */
+          padding-top: 100px; /* Location of the box */
+          left: 0;
+          top: 0;
+          width: 100%; /* Full width */
+          height: 100%;  /* Full height */
+          overflow: auto; /* Enable scroll if needed */
+          background-color: rgb(0,0,0); /* Fallback color */
+          background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        }
+
+        /* Modal Content */
+        .edit-content {
+          position: relative;
+          background-color: lightgrey;
+          margin: auto;
+          padding: 0;
+          border: 1px solid #888;
+          border-radius: 5px;
+          width: 70%;
+          /* height: 50%; */
+          left: -10%;
+          box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+          font-family: monospace; 
+          white-space: pre; 
+          overflow: auto;
+        }
+
+
+        .iframe-container {
+          overflow: hidden;
+          /* 16:9 aspect ratio */
+          padding-top: 56.25%;
+          position: relative;
+        }
+
+        .iframe-container iframe {
+           border: 0;
+          /* height: 100%; */
+           left: 0;
+           position: absolute;
+           top: 0;
+           width: 100%;
+        }
+
+        .viewerimg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 5px;
+            margin: 5px;
+            max-width: 100%;
+            z-index: 4;
+        }      
+
+        .delbutton{
+          background-color: lightgrey;
+          border: none;
+          color: white;
+          position: fixed;
+          left: 40%;
+          top: 0%;
+          padding: 0px;
+          padding-bottom: 8px;
+          margin: 0px;
+          height: 20px;
+          width: 20px;
+          z-index: 5;
+          text-align: center;
+          cursor: pointer;
+        }
+
+        .delbutton:hover {
+          background-color: white;
+        }
+   
+ 
+        /* Files pop */
+
+         popup {
+          position: relative;
+          /*position: absolute;*/
+          display: inline-block;
+          cursor: pointer;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
+        }
+
+        /* The actual popup */
+        .popup .popuptext {
+          visibility: hidden;
+          width: 80%;
+          background-color: #aaa;
+          color: #fff;
+          text-align: left;
+          border-radius: 6px;
+          padding: 4px 0;
+          position: absolute;
+          z-index: 1;
+          bottom: 100%;
+          left: 100%; 
+          margin-left: -80px;
+        }
+
+        
+        .popup .popuptext::after {
+          content: "";
+          position: absolute;
+          top: 100%;
+          left: 20%;
+          margin-left: -5px;
+          border-width: 5px;
+          border-style: solid;
+          border-color: #555 transparent transparent transparent;
+        }
+
+        /* Toggle this class - hide and show the popup */
+        .popup .show {
+          visibility: visible;
+          -webkit-animation: fadeIn 1s;
+          animation: fadeIn 1s;
+        }
+
+        /* Add animation (fade in the popup) */
+        @-webkit-keyframes fadeIn {
+          from {opacity: 0;} 
+          to {opacity: 1;}
+        }
+
+        @keyframes fadeIn {
+          from {opacity: 0;}
+          to {opacity:1 ;}
+        }
+        
+        .playbutton {
+            margin: 0px;
+            margin-left:  4px;
+            margin-right: 10px;
+            padding: 0px;
+            padding-left: 10px;
+            padding-right:10px;
+            float: right;
+            font-size: 70%; 
+        }
+        
+        .little{
+            position: absolute;
+            top: 0px;
+            margin: 5px;
+            padding: 10px;
+            font-size: 30px;
+          
+        }
+        
+         .little a{
+            text-decoration: none;
+        }
+      
+	</style>
+</head>
+<body>
+
+ 
+	<header>
+         <div class="little"><a href="/settings" title="Settings">&#128295;</a>&nbsp;<a href="/upload" title="Upload">&#x1F69A;</a></div>
+	</header>
+     
+        <audio id="audio">  
+            <source  id="audiosrc" />
+        </audio> 
+        
+        <div id="oviewer" class="edit">
+            <button id="viewerclose" title="close" class="delbutton" onclick="hideed" >&#10060;</button>
+            <div id="viewerc" class="edit-content iframe-container">
+                <img class="viewerimg" id="imgviewer"/><iframe id="viewer" class="iframe">No iframes</iframe>	
+            </div>
+        </div>
+        
+	<main>
+
+       
+
+            <div id="fscontainer"> </div>
+            
+  
+            <div id="fileinfo" class="popup">
+                <span class="popuptext" id="filetxt"></span>
+            </div>
+
+            
+		  
+		<div id="description">
+			Made thanks to the Treejs javascript at  <a href="https://github.com/m-thalmann/treejs/blob/master/README.md" target="_blank">Github</a>.
+		</div>
+	</main>
+
+    <script>
+    
+      var fsview;
+      var systemroot;
+      var clipboard={type : 0, nodes: []};  
+
+        var playhtml  =   '&#x25b6;';    
+        var pausehtml =   '&#x23f8;';
+        var playscript  = '\u25b6';    
+        var pausescript = '\u23f8';
+        var trashhtml=    '&#x1F5D1;';
+        var trashscript=  '\uD83D\uDDD1;';
+        var upltreehtml = '&#8648;'//'&#128471;';  // overlapping windows
+        var uplfilehtml = '&#8593;'//'&#128464;';
+        var delallhtml  = '&#x1F5D1;';
+        var cuthtml     = '&#9986;';
+        var copyhtml    = '&#128458;';
+        var pastehtml   = '&#128203;';
+        var mkdirhtml   = '&#11190;';
+        var downhtml    = '&dArr;'
+        
+    function popuptoggle(){
+             var popup = document.getElementById("filetxt");
+             popup.classList.toggle("show");
+        }
+    
+    function isImage ( filename ){
+            imgtypes = ",jpg,png,gif,ico,bmp,svg,";
+            filetype = ","+ filename.substring(filename.lastIndexOf( '.') + 1).toLowerCase() +",";
+                    
+            if ( imgtypes.includes( filetype ) ) return true;
+            return false;
+        }
+   
+    function viewfile(e){
+            var file = e.target.parentNode.childNodes[0].childNodes[0].nodeValue;
+            var viewer = document.getElementById("viewer");
+            var imgviewer = document.getElementById("imgviewer");
+            var viewerc = document.getElementById("viewerc");
+
+            if ( isImage ( file ) ){ 
+                imgviewer.style.visibility = 'visible';
+                viewer.style.visibility = 'hidden';
+
+                imgviewer.src = file; 
+                imgviewer.alt = file.substring(file.lastIndexOf( '/') + 1);           
+                imgviewer.addEventListener('load', adjust_imagesize);
+           }else{
+                imgviewer.style.visibility = 'hidden';
+                viewer.style.visibility = 'visible';
+
+                viewer.addEventListener('load', adjust_iframesize );
+                viewer.src = file;               
+            }
+ //           document.getElementById("oviewer").style.display = "block";
+            window.onclick=hideed;   
+        }
+       
+       
+    function hideed(e) {
+        var viewer = document.getElementById("viewer");
+        var oviewer = document.getElementById("oviewer");
+        var targetid = e.target.id;
+        
+       
+                     
+        if ( targetid != "oviewer" && targetid != "viewerclose" ) return;
+        
+        oviewer.style.display = "none";
+        document.getElementById("oviewer").style.display = "none";
+        //console.log( "closing oviewer");
+
+        imgviewer = document.getElementById("imgviewer");
+        imgviewer.src='';
+        imgviewer.alt='';
+        viewer.src= '';
+        
+        window.removeEventListener('click',hideed);  
+          
+        }
+
+    function adjust_imagesize(e){
+//  adjusting size in Firefox causes issues: after loading a large image all image are
+//  set to that size. Setting the style width and height works fine.       
+        var imagew = e.target.width;
+        var imageh = e.target.height;
+        //console.log('image width: '+ imagew + ' image height : ' + imageh ); 
+    
+        if ( (imagew&1) ) ++imagew;
+        
+       if ( imagew > document.body.scrollWidth ) {
+             let maxw = document.body.scrollWidth/2;
+             let maxh = ((maxw*imageh)/imagew); // keep aspect ratio
+            
+            e.target.style.width  = maxw + 'px';
+            e.target.style.height = maxh + 'px';
+            
+            imagew = maxw;
+            imageh = maxh;
+            //console.log('changed image width: '+ imagew + ' image height : ' + imageh ); 
+        }else{
+            e.target.style.width  = imagew + 'px';
+            e.target.style.height = imageh + 'px';
+        }
+        
+        
+        var parenth = imageh + 10;
+        var parentw = imagew + 10;
+        
+        e.target.parentNode.style.height = parenth +'px';
+        e.target.parentNode.style.width  = parentw +'px';
+        e.target.parentNode.style.padding  = 0 +'px';
+   
+        document.getElementById("oviewer").style.display = "block";
+ 
+        }
+    
+    function adjust_iframesize(e){
+        //console.log( 'adjust width');
+        try{
+            console.log( 'nodeName = '+ e.target.contentDocument.body.firstChild.nodeName );
+        }catch{
+            return;
+        }
+         contenth = e.target.contentWindow.document.body.scrollHeight;
+         contentw = e.target.contentWindow.document.body.scrollWidth;
+            
+         contenth += 20;
+         contentw += 20;
+            
+         contentw = document.body.scrollWidth/2;
+         contenth = document.body.scrollHeight;
+            
+         if ( contentw > document.body.scrollWidth ) contentw = document.body.scrollWidth - 40;
+
+     
+        parenth = contenth ;
+        parentw = contentw ;
+        
+        //console.log( 'adjust width ' + contentw + ' height '+ contenth );
+        e.target.style.height = contenth +'px';
+        e.target.style.width  = contentw +'px';
+        
+        //console.log('parent id '+ e.target.parentNode.id);
+        
+        e.target.parentNode.style.height = parenth +'px';
+        e.target.parentNode.style.width  = parentw +'px';
+        e.target.parentNode.style.padding  = 0 +'px';
+
+        document.getElementById("oviewer").style.display = "block";
+
+        }
+       
+      function humansize ( bytesize ){
+        
+        var m = '';
+        var returnbytes;
+        
+        if ( bytesize < 1024 ) {
+            returnbytes = bytesize;
+        }else if ( bytesize < (1024*1024)  ){
+           returnbytes = (bytesize/1024);
+           m = 'K';
+        }else if( bytesize < (1024*1024*1024)  ){
+            returnbytes = (bytesize/( 1024 * 1024));
+            m = 'M';
+        }else{
+            returnbytes = (bytesize/ (1024*1024*1024));
+            m = 'G';
+        }
+        
+        returnbytes = Math.round((returnbytes + Number.EPSILON) * 100) / 100;
+        //console.log( 'Bytesin '+ bytesize + ' human: ' + returnbytes + m );
+        return( (returnbytes) + m );
+       }
+    
+    
+      
+      function add_files( directory, fsTreenode, root){
+            
+            if ( root ){
+               flist = [ directory ];         
+            }else{
+                if ( typeof directory.files == "undefined" ){
+                    var flist = directory.filesystems;
+                }else{
+                   var flist = directory.files;
+                }
+            }
+            
+            for ( f of flist ){
+            
+                fopt = { ref : f } ;
+                
+                if ( 3 == f.type ){ // files
+                    ftype = f.name.substring(f.name.lastIndexOf('.')+1);
+                    if ("jpg" == ftype || "gif" == ftype || "png" == ftype || "bmp" == ftype || "ico"== ftype ) fopt = { ref: f, icon : "&#128444;"};
+                    if ( "mp3" == ftype || "wma" == ftype ||"aac" == ftype || "m4a" == ftype || "flac" == ftype) fopt = { ref: f, icon : "&#127901;"};
+                }
+                
+                if ( 3 == f.type || 1 == f.type ){ // files and filesystems
+                    sizerspan = '<span style="float: right;">' + humansize( f.size ) + '</span>';
+                }
+                
+                if ( 2 == f.type) { // directories
+                    fopt = { ref: f, icon: "&#x1f5c1"}; 
+                    sizerspan = '';
+                }
+                if ( 1 == f.type) { // filesystem
+                    fopt = { ref: f, icon: "&#128427;"}; 
+                    sizerspan = '';
+                }
+                if ( 0 == f.type) { // system
+                    //var systemopt = { ref: fsobj, icon : "&#128187;"};         
+                    //var system = new TreeNode( fsobj.hostname, systemopt );
+                    fopt = { ref: f, icon: "&#128187;"}; 
+                    sizerspan = '';
+                }
+                
+                fnode = new TreeNode( f.name.substring(f.name.lastIndexOf('/')+1) + sizerspan, fopt);
+                if ( root ) systemroot = fnode;
+                
+                fnode.on( "deselect", function( node ){
+                    var popuptxt = document.getElementById("filetxt");
+                    popuptxt.innerHTML =  '';
+                    popuptxt.classList.remove("show");
+                });
+                               
+                fnode.on( "contextmenu", function( e, clicknode ){
+                        
+                        e.stopPropagation();
+                        var nodes = fsview.getSelectedNodes();  
+                        var selected=[];
+                        
+                        if ( nodes.length < 2 ){
+                            nodes = [clicknode];
+                        }
+                        
+                        var popup = document.getElementById("fileinfo");
+                        var popuptxt = document.getElementById("filetxt");
+ 
+                        fsheight = document.getElementById("fscontainer").offsetHeight;
+                        fswidth  = document.getElementById("fscontainer").offsetWidth;
+                        popupwidth = popup.offsetWidth;
+                        
+                        //console.log( 'pageY : '+ e.offsetY +' fsheight : '+ fsheight +' fswidth : '+ fswidth);
+                        
+                        topvalue  = (e.pageY - 245 - ( (nodes.length -2)* 8) );
+                        leftvalue = -85; 
+                        
+                        topvalue = topvalue - fsheight;
+                        
+                        popup.style.top = topvalue + 'px';
+                        popup.style.left = leftvalue + '%';
+                        
+                        newtxt = '<ul id="filelist" style="list-style-type:none">';
+
+                        for ( node of nodes ) {
+                            
+                            fileobj  = TreeUtil.getProperty( node.getOptions(), "ref", "");
+                            //console.log( fileobj ); 
+                            if ( 3 === fileobj.type )newtxt += '<li><span class="filename">' + fileobj.name + '</span>';
+                            if ( 2 === fileobj.type )newtxt += '<li><span class="dirname">' + fileobj.name + '</span>';
+                            if ( 1 === fileobj.type )newtxt += '<li><span class="fsname">' + fileobj.name + '</span>';
+                            if ( 0 === fileobj.type )newtxt += '<li><span class="systemname">' + fileobj.name + '</span>';
+                            
+                            selected.push( fileobj.name );
+                                    
+                             // fileobj.type 0 = system, 1 = filesystem, 2= directory, 3 = file
+                            delopt = '<button class="playbutton" onClick="delfile(this)" title="Delete">&#x1F5D1;</button>';                            
+                           
+                            if ( fileobj.type > 1 && fileobj.name.lastIndexOf('/') != 0 ){
+                                newtxt += delopt;                   
+                            }
+                            
+                            if ( 3 == fileobj.type ){
+                               newtxt += '<button class="playbutton" onClick="downloadfile(this)" title="Download">'+downhtml+'</button>';     
+                            }
+                            
+                            
+                            if ( fileobj.type == 2 && nodes.length == 1 && clipboard.nodes.length ){
+                                newtxt += '<button class="playbutton " style="visibility: hidden;" id="pastebutton" title="Paste">'+ pastehtml + '</button>';
+                            }
+                            
+                            if ( 3 === fileobj.type ){
+ 
+                                ftype = fileobj.name.substring(fileobj.name.lastIndexOf('.')+1);
+                                if ( "mp3" == ftype || "m4a" == ftype || "flac" == ftype){
+                                   playopt = '<button class="playbutton" onClick="playfile(this)" title="Play">&#x25b6;</button>'; 
+                                   newtxt += playopt; 
+                                };
+                
+                                sizerspan = '<span style="float: right;">'+ humansize( fileobj.size ) + '</span>';
+                            }    
+                            
+                            if ( 2 === fileobj.type ){
+                                uplopt ='<button class="playbutton" onClick="upload(this,0)" title="Upload files to this directory">' + uplfilehtml +'</button>';
+                                uplopt +='<button class="playbutton" onClick="upload(this,1)" title="Upload directory tree to this directory">' + upltreehtml +'</button>';
+                                uplopt +='<button class="playbutton" onClick="mkdir(this)" title="Make subdirectory">' + mkdirhtml +'</button>';
+                                newtxt += uplopt;
+                                
+                                sizerspan = '<span style="float: right;">directory, ' + node.getChildCount() + ' files</span>';
+                            }
+                            if ( 1 === fileobj.type ){
+                                let fssize = humansize( fileobj.size );
+                                let fsfree = humansize( fileobj.free );
+                                let fsused = humansize( fileobj.used );
+                                sizerspan = '<span style="float: right;">filesystem mounted at ' + fileobj.mount +', size: ' + fssize + ' free: ' + fsfree + ' used: '+ fsused + '</span>';    
+                            }
+                            if ( 0 === fileobj.type ){
+                                sizerspan = '<span style="float: right;"> ESP</span>';    
+                            }
+                                
+                            newtxt += sizerspan;
+                            newtxt += '</li>';
+                            
+                            
+                        }
+                        
+                        newtxt += '<li>';
+                        if ( selected.length > 1 ){
+                            newtxt += '<button class="playbutton" style="margin-left: 25px;" id="deleteall" title="Delete All">'+delallhtml+'</button>'; 
+                        }
+                        
+                        newtxt += '<button class="playbutton" id="cutall" title="Cut">'+cuthtml+'</button>'; 
+                        newtxt += '<button class="playbutton" id="copyall" title="Copy">'+copyhtml+'</button>'; 
+                        
+                        newtxt += '</li>';
+                        newtxt += '</ul>'; 
+                        
+                        newtxt += '<div id="result" style="text-align: center; background: lightgrey; margin-top: 30px;"></div>';
+                        
+                        popuptxt.innerHTML =  newtxt;  
+                        popuptxt.classList.add("show");
+                        
+                        addrenameinput();   
+                        
+                        if ( selected.length > 1 ){
+                           document.getElementById('deleteall').addEventListener('click', function(){ deleteall( selected ); } );
+                        }
+                        
+                        document.getElementById('copyall').addEventListener('click', function(){ cutcopyall( 1, nodes); } );
+                        document.getElementById('cutall').addEventListener('click', function(){  cutcopyall( 2, nodes); } );
+                        if ( nodes.length == 1 && clipboard.nodes.length ){
+                            if ( TreeUtil.getProperty( nodes[0].getOptions(), "ref", "").type == 2 ){
+                                document.getElementById('pastebutton').addEventListener('click', function(){ pastefile( clicknode ); } );                        
+                                document.getElementById('pastebutton').style.visibility='visible';
+                            }
+                        }
+                    });
+                
+                
+                if ( !root )fsTreenode.addChild( fnode );
+                
+                
+                if ( f.type < 3 ) add_files( f , fnode, false); 
+                
+            }
+        }
+      
+    
+    function addrenameinput(){
+        filelist = document.getElementById( 'filelist');
+        
+            
+        filenames = filelist.getElementsByClassName('filename');
+        for( f of filenames){
+            //console.log('f.outerHTML: ' + f.outerHTML );
+            f.addEventListener('click',  toggle_editable );
+            f.addEventListener('contextmenu', viewfile);
+        }    
+        dirnames = filelist.getElementsByClassName('dirname');
+        for( f of dirnames){
+            //console.log('f.outerHTML: ' + f.outerHTML );
+            f.addEventListener('click',  toggle_editable );
+        }    
+
+
+    }
+    
+    
+    function toggle_editable( e ){
+
+        txt = e.target;
+        
+        if( txt.style.color == 'black' ){
+           // txt.style.color = 'white';
+           // txt.contentEditable = "false";               
+        }else{
+            txt.style.color = 'black';
+            txt.style.background = 'white';
+            txt.contentEditable = "true"; 
+            txt.oldname = txt.innerHTML; // add new property to save oldname
+            txt.addEventListener('blur', rename); 
+            txt.addEventListener('keydown', gotenter); 
+        }
+    }    
+    
+    function gotenter( e ){
+        if ( e.key == 'Enter'){
+            e.target.contentEditable = "false"; 
+            rename(e);
+        }
+    }
+    
+    function rename( e){
+        newname = e.target.innerHTML;
+        oldname = e.target.oldname;
+        if ( newname == oldname ){
+            //console.log('Names are the same; no rename done');
+            result.style.textAlign = 'center';
+            result.style.color = 'black';
+            result.style.background = 'white';
+            result.innerHTML = 'Old and new name are the same';    
+    
+            filenames = filelist.getElementsByClassName('filename');
+            for( f of filenames){
+                    f.style.color = 'white';
+                    f.style.backgroundColor = '#aaa';
+                    f.contentEditable = "false"; 
+                    f.removeEventListener('blur', rename);
+                    f.removeEventListener('keydown', gotenter);
+            }
+            
+            return;
+        }
+        
+        var xhttp = new XMLHttpRequest(); 
+        
+        xhttp.onreadystatechange = function() {
+
+                if ( this.readyState == 4 ){
+                    filelist = document.getElementById( 'filelist');
+        
+            
+                    filenames = filelist.getElementsByClassName('filename');
+                    for( f of filenames){
+                        f.style.color = 'white';
+                        f.style.backgroundColor = '#aaa';
+                        f.removeEventListener('blur', rename); 
+                        f.removeEventListener('keydown', gotenter);
+                    }    
+                    
+                    if (this.status == 200) {
+                    
+                        result.style.textAlign = 'center';
+                        result.style.color = 'black';
+                        result.style.background = 'white';
+                        result.innerHTML = 'Rename successful'; 
+
+                    }else{
+                        result.style.textAlign = 'center';
+                        result.style.color = 'white';
+                        result.style.background = 'red';
+                        result.innerHTML = 'Rename failed : ' + this.responseText ;    
+                    }
+                    get_dir_string();                    
+                    
+                }
+        };
+            
+        xhttp.open('GET', '/rename?oldname='+oldname + '&newname=' + newname ,true);
+        xhttp.send();
+    }
+    
+    function pastefile( node){
+        
+        var targetobj  = TreeUtil.getProperty( node.getOptions(), "ref", "");
+        var targetdirectory = targetobj.name;
+        var popup = document.getElementById("filetxt");
+        var result = document.getElementById('result');
+
+        removeaftercopy = 0;
+        if ( clipboard.type == 2 ){
+            removeaftercopy = 1;
+        }
+        
+        //console.log ( 'Paste to targetdirectory : ' + targetdirectory  );
+        
+        var data = new FormData();
+        
+        data.append( "filecount", clipboard.nodes.length);
+        data.append( "targetdirectory", targetdirectory);
+        data.append( "removesource", removeaftercopy );
+        
+        mvcount = 0;
+        for ( let f of clipboard.nodes ){
+        
+            fileobj  = TreeUtil.getProperty( f.getOptions(), "ref", "");
+            filename = fileobj.name;
+            filetype = fileobj.type;
+            
+            data.append( 'file'+ mvcount, filename);
+            //console.log( '  type: ' +filetype +' name: '+ filename );
+            
+            mvcount++;
+        }
+        
+        var xhttp = new XMLHttpRequest(); 
+            
+        xhttp.onreadystatechange = function() {
+                if ( this.readyState == 4 ){
+                    
+                    clipboard={type : 0, nodes: []};
+                    document.getElementById('pastebutton').style.visibility='hidden';
+                    
+                    if (this.status == 200) {
+                    
+                        result.style.textAlign = 'center';
+                        result.style.color = 'black';
+                        result.style.background = 'white';
+                        result.innerHTML = 'Copy successful';    
+
+
+                    }else{
+                        result.style.textAlign = 'center';
+                        result.style.color = 'white';
+                        result.style.background = 'red';
+                        result.innerHTML = 'Copy failed : ' + this.responseText ;    
+                    }
+                    get_dir_string();                    
+                    
+                }
+        };
+            
+        xhttp.open("POST", "/move",true);
+        xhttp.send( data );
+    
+    }
+    
+    
+    function cutcopyall( type, treenodes ){
+            clipboard.nodes = treenodes; //fsview.getSelectedNodes();//JSON.parse(JSON.stringify(  fsview.getSelectedNodes() ));
+            clipboard.type  = type;
+            
+            //console.log('cutcopyall: type: ' + clipboard.type + ' type : '+ type  + ' number of nodes: '+clipboard.nodes.length );
+            for ( let f of clipboard.nodes ){
+            
+                fileobj  = TreeUtil.getProperty( f.getOptions(), "ref", "");
+                filename = fileobj.name;
+                filetype = fileobj.type;
+                
+                //console.log( 'Adding to clipboard  type: ' +filetype +' name: '+ filename );
+            }
+            nodes = fsview.getSelectedNodes(); 
+            //console.log ( 'unselect alle selected nodes ');
+            for ( node of nodes ){    
+                node.toggleSelected();
+            }
+            fsview.reload();
+            
+    }
+    
+    
+    function playfile( buttonelement ){
+        
+        var audioplayer = document.getElementById('audio');
+        var audiosrc = document.getElementById('audiosrc');
+        
+        var song = buttonelement.parentNode.childNodes[0].childNodes[0].nodeValue;
+        
+        if ( buttonelement.innerHTML == playscript ){
+        
+           //for( p of document.getElementsByClassName( "playbutton" ) ) p.innerHTML = playhtml; 
+           audiosrc.src = song;
+           buttonelement.innerHTML = pausehtml; 
+
+           audioplayer.load();      
+           audioplayer.play();
+            
+           
+        } else{
+           audioplayer.pause();
+           buttonelement.innerHTML = playhtml;
+           //console.log('pausing, but to' + playhtml); 
+           audiosrc.src = "";
+        }     
+    }
+
+
+    function deleteall( selected ){
+        
+        var delcount=0;
+        var popup = document.getElementById("filetxt");
+        
+        var data = new FormData();
+        
+        data.append( "filecount", selected.length);
+        for ( f of selected ){
+            data.append( 'file'+ delcount, f);
+            delcount++;
+        }
+        
+        var xhttp = new XMLHttpRequest(); 
+            
+        xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    get_dir_string();
+                    
+                    popup.classList.remove("show");
+                }
+        };
+            
+        xhttp.open("POST", "/delete",true);
+        xhttp.send( data );
+        
+    }
+    
+     function downloadfile( buttonelement ){
+        
+        
+        var file = buttonelement.parentNode.childNodes[0].childNodes[0].nodeValue;
+        var viewer = document.getElementById("viewer");
+        
+        viewer.src = file + '?download=1';
+    }
+    
+    function delfile( buttonelement ){
+        
+        
+        var file = buttonelement.parentNode.childNodes[0].childNodes[0].nodeValue;
+        
+        var xhttp = new XMLHttpRequest(); 
+            
+        xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    
+                    var popup = document.getElementById("filetxt");
+                    popup.classList.remove("show");
+                    
+                    get_dir_string();
+                }
+        };
+            
+        xhttp.open("GET", "/delete?file="+file,true);
+        xhttp.send();
+        
+
+    }
+    
+    function mkdir( mkdirbutton ){
+        
+        var popup  = document.getElementById("filetxt");
+        var parentdir = mkdirbutton.parentNode.childNodes[0].childNodes[0].nodeValue;
+        
+        //console.log( 'Directory : ' + parentdir );
+        
+        var popup     = document.getElementById("filetxt");
+        var result    = document.getElementById('result');
+        var popupHTML = popup.innerHTML;
+        
+        upltxt = '<div>New subdirectory name &nbsp; <input type="text"';       
+        upltxt += ' name="subdirname" style="width: 300px;" id="subdirname" /></div>';
+        upltxt += '<div><input type="button" value="CreateSubdirectory" id="domkdirbutton" /><div>';
+       
+                
+        popup.innerHTML += upltxt;
+        
+        domkdirbutton = document.getElementById('domkdirbutton');
+        domkdirbutton.parentdir = parentdir;
+        domkdirbutton.addEventListener('click', domkdir );
+        
+    
+    
+    }
+    
+    function domkdir ( e ){
+        
+        var result = document.getElementById('result');
+        var directory = e.target.parentdir;
+        
+        subdirname = document.getElementById("subdirname").value.trim();
+        if ( subdirname == ''){
+                    result.style.textAlign = 'center';
+                    result.style.color = 'white';
+                    result.style.background = 'red';
+                    result.innerHTML = 'Subdirectory name cannot be empty';    
+                    return( false ) ;
+        }
+            
+        fullsubdirname = directory + '/' + subdirname; 
+        //console.log( 'Directory : ' + fullsubdirname );
+        
+        var xhttp = new XMLHttpRequest(); 
+        
+        xhttp.onreadystatechange = function() {
+                if ( this.readyState == 4 ){
+                
+                if (this.status == 200) {
+                
+                    result.style.textAlign = 'center';
+                    result.style.color = 'black';
+                    result.style.background = 'white';
+                    result.innerHTML = 'Subdirectory ' + fullsubdirname + ' successfully created';    
+
+
+                }else{
+                    result.style.textAlign = 'center';
+                    result.style.color = 'white';
+                    result.style.background = 'red';
+                    result.innerHTML = 'Failed to create subdirectory ' + fullsubdirname + ' '+ this.responseText;    
+                }
+                get_dir_string();                    
+                
+            }
+        };
+            
+        xhttp.open("GET", "/mkdir?subdir="+fullsubdirname,true);
+        xhttp.send();
+        
+    }
+    
+
+        
+    function upload( buttonelement, treeupload ){
+    
+        var directory    = buttonelement.parentNode.childNodes[0].childNodes[0].nodeValue;
+        var popup = document.getElementById("filetxt");
+        var popupHTML = popup.innerHTML;
+        
+        upltxt = '<div>Select files to upload: <input type="file"';
+        if ( treeupload ){
+             upltxt += ' webkitdirectory mozdirectory';                   
+        }else{
+             upltxt += ' multiple';
+        }     
+        upltxt += ' name="fileblob" style="width: 300px;" id="pt" /></div>';
+        upltxt += '<div><input type="button" value="Upload" id="upbutton" /><div>';
+        //upltxt += '<div id="uploadresult"></div>';
+                
+        popup.innerHTML += upltxt;
+        
+        document.getElementById('upbutton').addEventListener('click', function(){ modfilenames( directory, treeupload  ); } );
+    }
+    
+    
+    function modfilenames( basedir, treeupload ){
+    
+            // Get the file the user picked
+            var files        = document.getElementById('pt').files;
+            var result       = document.getElementById('result');
+
+            //result.style.textAlign = 'center';
+            //result.style.background = 'lightgrey';
+            //result.innerHTML = '';       
+            
+            if (!files.length) {
+                return;
+            }
+            
+            var data = new FormData();
+            
+            data.append( "dir",basedir);
+            for (let i = 0; i < files.length; i++) {
+                //console.log( 'File '+ i + 'name ' + files[i].name);
+                if ( treeupload  ){
+                    var newname = basedir + '/' + files[i].webkitRelativePath;
+                }else{    
+                    var newname = basedir + '/' + files[i].name.replace(/^.*[\\\/]/, '');
+                }                                                                
+                var newfile = new File( [ files[i] ], newname ); 
+
+                //console.log( 'File '+ i + 'new name ' + newname);
+                
+                data.append(data, newfile);
+            }
+           
+           
+           fetch('/upload', {
+                method: "POST",
+                body: data
+            })
+            .then(response => {
+                
+                if (!response.ok) {
+                    
+                    result.style.textAlign = 'center';
+                    result.style.color = 'white';
+                    result.style.background = 'red';
+                    result.innerHTML = 'Upload failed';
+                    
+                    get_dir_string();
+                    
+                    throw new Error("HTTP error " + response.status);
+                }
+                
+                result.style.textAlign = 'center';
+                result.style.color = 'black';
+                result.style.background = 'white';
+                result.innerHTML = 'Upload successful';
+                
+                get_dir_string();
+                
+                return response.text(); // or response.json() or whatever
+            })
+            .then(response => {
+                // Do something with the response
+            })
+            .catch(error => {
+                // Do something with the error
+            });
+        }
+        
+        
+    function reset_selections(e){
+         
+                //e.stopPropagation();
+                e.preventDefault();
+                
+                nodes = fsview.getSelectedNodes(); 
+                //console.log ( 'contextmenu-unselect alle selected nodes ');
+                for ( node of nodes ){    
+                    node.toggleSelected();
+                }
+                fsview.reload();
+                
+                
+                var popup = document.getElementById("filetxt");
+                popup.classList.remove("show");
+    
+    }
+    
+    function reloadTree(){    
+        
+         fsview.reload();
+         
+         fsdiv =  document.getElementById("fscontainer");            
+         fsdiv.addEventListener('contextmenu', reset_selections );
+         //fsdiv.addEventListener('click', reset_selections );
+         
+         body = document.getElementsByTagName("body")[0];
+         body.addEventListener('contextmenu', reset_selections );
+
+    }
+    
+    function build_fstree( fsobj ){  
+         
+        add_files( fsobj, systemroot, true);
+        
+   		fsview = new TreeView( systemroot, "#fscontainer");
+        reloadTree();
+     }
+      
+    function get_dir_string(){
+            
+            var xhttp = new XMLHttpRequest(); 
+
+            //console.log( 'length of clipboard '+ clipboard.nodes.length);
+            
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    JSON.parse( xhttp.responseText );
+                    build_fstree( JSON.parse( xhttp.responseText ) );
+                }
+            };
+            
+            xhttp.open("GET", "/list",true);
+            setTimeout( xhttp.send(), 1000);
+        }    
+
+    
+
+   get_dir_string();
+    
+
+    </script>
+
+</body>
+</html>

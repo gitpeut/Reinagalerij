@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+
+<style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background: lightgrey;
+            padding: 0;
+			margin: 0;
+        }
+
+ 
+        
+        header img{
+            display: block;
+            width: 100px;
+            margin: auto;
+        }
+        header{
+            width: 100%;
+            height: 80px;
+            background: green;
+            margin-bottom: 40px;
+        }
+        .little{
+            position: absolute;
+            top: 0px;
+            margin: 5px;
+            padding: 10px;
+            font-size: 30px;
+            vertical-align: text-top;
+            
+        }
+        .little a{
+            text-decoration: none;
+        }
+</style>
+<script>
+
+
+</script>
+</head>
+<html>
+
+<header>
+          <div class="little"><a href="/" title="Home" style="background: green;">&#x1F3E0;</a>&nbsp;<a href="/settings" title="Settings" style="background: green;">&#128295;</a></div>
+</header>
+
+<div>
+<label for="fs">Upload to filesystem:</label>
+<select name="fs" id="fs">
+<option value="/sdcard" selected>SD_MMC</option>
+<option value="/littlefs">LITTLEFS</option>
+</select>
+</div>
+
+<div>
+
+<h5>Select input, files or directory</h5>
+
+<form onchange="toggletree()">
+<input type="radio" name="tree" id="uploadtree"  value="1" >Directory<br>
+<input type="radio" name="tree" id="uploadfiles" checked value="0">Files<br>
+</form>
+
+<h5 id="treetitle">Local files to upload</h5>
+
+<input type='file' multiple name='blob' style='width: 50%;' id='filenames'><br>
+<div id="result">&nbsp;</div>
+<button id=uploadbutton onclick="upload()">Upload</button>
+
+</table>
+
+<script>
+var treeupload=0;
+
+document.getElementById('fs').selectedIndex = 0;
+document.getElementById('uploadfiles').checked = true;
+
+toggletree();
+
+//-------------------------------------------------------------------------
+
+function toggletree(){
+console.log("--- toggletree---");
+
+let fssel = document.querySelectorAll('input[name="tree"]');
+
+for( b of fssel ){
+if ( b.checked ){
+treeupload = parseInt(b.value);
+break;
+}
+}
+
+
+fileselect = document.getElementById('filenames');
+if ( treeupload == 1 ){
+document.getElementById('treetitle').innerHTML="Local directory to upload";
+//' webkitdirectory mozdirectory';
+fileselect.webkitdirectory=true;
+fileselect.multiple=false;
+}else{
+document.getElementById('treetitle').innerHTML="Local files to upload";
+//multiple
+fileselect.webkitdirectory=false;
+fileselect.multiple=true;
+}
+}
+
+//-------------------------------------------------------------------------
+
+function upload(){
+
+// Get the file the user picked
+var files        = document.getElementById('filenames').files;
+var result       = document.getElementById('result');
+
+if (!files.length) {
+return;
+}
+
+basedir =  document.querySelector('#fs').value;
+
+var data = new FormData();
+
+data.append( "dir",basedir);
+
+for (let i = 0; i < files.length; i++) {
+
+if ( treeupload == 1 ){
+var newname = basedir + '/' + files[i].webkitRelativePath;
+}else{
+var newname = basedir + '/' + files[i].name.replace(/^.*[\\\/]/, '');
+}
+var newfile = new File( [ files[i] ], newname );
+
+result.style.textAlign = 'center';
+result.style.color = 'lightgrey';
+result.style.background = 'lightgrey';
+result.innerHTML = '&nbsp;';
+
+data.append(data, newfile);
+}
+
+
+fetch('/upload', {
+method: "POST",
+body: data
+})
+.then(response => {
+
+if (!response.ok) {
+
+result.style.textAlign = 'center';
+result.style.color = 'white';
+result.style.background = 'red';
+result.innerHTML = 'Upload failed';
+
+get_dir_string();
+
+throw new Error("HTTP error " + response.status);
+}
+
+result.style.textAlign = 'center';
+result.style.color = 'black';
+result.style.background = 'white';
+result.innerHTML = 'Upload successful';
+
+get_dir_string();
+
+return response.text(); // or response.json() or whatever
+})
+.then(response => {
+// Do something with the response
+})
+.catch(error => {
+// Do something with the error
+});
+}
+</script>
+</html>
