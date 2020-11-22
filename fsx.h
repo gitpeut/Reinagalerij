@@ -6,12 +6,14 @@
 #include <WiFiClient.h>
 #include <esp_wifi.h>
 #include <WiFiMulti.h>
-#include <WebServer.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 #include <ESPmDNS.h>
 #include <Update.h>
 
 #include "soc/timer_group_struct.h"
 #include "soc/timer_group_reg.h"
+#include <esp_task_wdt.h>
 #include <dirent.h>
 #include <FS.h>
 #include <FFat.h>
@@ -99,12 +101,13 @@ static const char *cperror[7] PROGMEM = {"ok" ,
 
 
 extern std::vector<struct fsd>  fsdlist;
-extern WebServer                fsxserver;
+extern AsyncWebServer           fsxserver;
 extern TaskHandle_t             startwifiTask;   
 extern TaskHandle_t             FSXServerTask;
 extern TaskHandle_t             tftshowTask;
 extern SemaphoreHandle_t updateSemaphore;
 extern SemaphoreHandle_t tftSemaphore;
+
 
 void    fs2json( fs::FS &fs, const char *fsmount, const char *dirname, char **s , int depth = 0);
 void    allfs2json( char **s);

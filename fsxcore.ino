@@ -142,13 +142,15 @@ void deltree( fs::FS *ff, const char *path ){
     while ( entry = dir.openNextFile() ){          
       
       if ( entry.isDirectory()  ){
-         deltree( ff, entry.name() );        
+         deltree( ff, entry.name() );  
+         esp_task_wdt_reset();      
       } else{ 
          char* tmpname = strdup( entry.name() );
          entry.close();// openNextFile opens the file, LittleFS will refuse to delete the file if open;
                        // FAT doesn't mind
          Serial.printf( "result of removing file %s: %d\n", tmpname, ff->remove( tmpname ) );
          free( tmpname );
+         esp_task_wdt_reset();
       }     
       
     }
@@ -181,7 +183,8 @@ int copytree( fs::FS *sourcefs, String &sourcefspath, fs::FS *targetfs, String &
 
     // copyfile will copy the file if source is a file, or create a directory if source is a directory 
     result = copyfile( sourcefs, sourcefspath, targetfs, targetfspath);
-
+    esp_task_wdt_reset();
+    
     if(!dir.isDirectory() || result ){
        if( !dir.isDirectory() ) Serial.println(sourcefspath + " is a file\n");
        dir.close();
@@ -262,7 +265,8 @@ int copyfile( fs::FS *sourcefs, String &sourcefspath, fs::FS *targetfs, String &
       }
 
       totalbytesread += bytesread;
-
+      esp_task_wdt_reset();
+      
       byteswritten = 0;
       while( byteswritten < bytesread ){
              writeresult= targetfile.write( &readbuffer[ byteswritten ], bytesread - byteswritten );    

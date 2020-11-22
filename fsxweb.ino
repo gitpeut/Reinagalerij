@@ -1,10 +1,19 @@
 #include "fsx.h"
 
-WebServer     fsxserver(80);
-TaskHandle_t  FSXServerTask;
+AsyncWebServer  fsxserver(80);
+TaskHandle_t    FSXServerTask;
 SemaphoreHandle_t updateSemaphore;
 
 //------------------------------------------------------------------------------------
+// added esp_task_wdt_reset(); in some tight loops against task watchdog panics.
+
+void getFS(){
+    xSemaphoreTake( updateSemaphore, portMAX_DELAY);
+}
+
+void loseFS(){
+    xSemaphoreGive( updateSemaphore);
+}
 
 
 //==============================================================
@@ -105,9 +114,8 @@ String formatBytes(size_t bytes) {
 //---------------------------------------------------------------------------
 
 String getContentType(String filename) {
-  if (fsxserver.hasArg("download")) {
-    return "application/octet-stream";
-  } else if (filename.endsWith(".htm")) {
+  
+  if (filename.endsWith(".htm")) {
     return "text/html";
   } else if (filename.endsWith(".html")) {
     return "text/html";
@@ -144,9 +152,14 @@ String getContentType(String filename) {
   }
   return "text/plain";
 }
-//---------------------------------------------------------------------------
 
-bool handleFileRead(String path) {
+
+//--------------------------------------------------------------------------------
+
+void handleFileRead(  AsyncWebServerRequest *request ) {
+
+  String path = request->url();
+  
   Serial.println("handleFileRead: " + path);
   if (path.endsWith("/")) {
     path += "index.htm";
@@ -165,133 +178,231 @@ bool handleFileRead(String path) {
   }else{
       fspath = path.substring( fileoffset( path.c_str()) );
   }
- 
+
+
+    
   String contentType = getContentType(path);
   String pathWithGz = fspath + ".gz";
   
+  getFS();
   
   if ( ff->exists(pathWithGz) || ff->exists(fspath)) {
     if ( ff->exists(pathWithGz)) {
       fspath += ".gz";
     }
-    File file = ff->open(fspath, "r");
-    fsxserver.streamFile(file, contentType);
-    file.close();
+
+    if ( request->hasParam("download") )contentType = "application/octet-stream";
+
+    request->send( *ff, fspath, contentType );
+
+    loseFS();
     Serial.printf("File has been streamed\n");
-    return true;
+    
+    return;
   }
-  Serial.printf("No such file %s\n", fspath.c_str());
-  return false;
-}
-
-//---------------------------------------------------------------------------
-void handleFileUpload() {
-//holds the current upload
-
-  static File fsUploadFile;
-  HTTPUpload& upload = fsxserver.upload();
-  String  fspath;
-  static int bcount=0;
-  
-  if (upload.status == UPLOAD_FILE_START) {
-
-    
-    lister.close();
-  
-    String path = upload.filename;
-    if (!path.startsWith("/")) {
-      path = "/" + path;
-    }
-    
-    Serial.print("handleFileUpload Name: "); 
-    Serial.println(path);
-
-    fs::FS  *ff = fsfromfile( path.c_str() );
-    
-    if ( ff == NULL ){
-      ff = fsdlist.back().f;
-      //flash filesystems added last to fsdlist, due ffat bug
-      path = fsdlist.back().fsmount + path;
-      Serial.printf("Upload fallen back to filesystem %s\n", fsdlist.back().fsname ); 
-    }
-   
-    fspath = path.substring( fileoffset( path.c_str()) );
-    
-    if (fspath == "/") {
-      return fsxserver.send(500, "text/plain", "/ is not a valid filename");
-    }
-     
-    Serial.printf( "Making all directories for %s on %s\n",  fspath.c_str(), nameoffs( ff ) );
-    Serial.println( "Length of filename " + fspath + " " + String( fspath.length()) );
-        
-    makepath ( *ff, fspath );
-    bcount=0;
-    
-    fsUploadFile = ff->open(fspath, "w");
-    if ( !fsUploadFile  ){
-          Serial.println("Error opening file " + fspath + " " + String (strerror(errno)) );
-          return fsxserver.send(400, "text/plain", String("Error opening ") + fspath + String(" ") + String ( strerror(errno) ) );
-    }
-    
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
-    int olderrno = errno;
-    if (fsUploadFile) {
-         if ( fsUploadFile.write(upload.buf, upload.currentSize) < upload.currentSize ){
-           fsUploadFile.close();
-           if ( olderrno != errno )return fsxserver.send(500, "text/plain", "Error during write : " + String ( strerror(errno) ) );
-           Serial.println("Error writing file " +fspath + " " + String (strerror(errno)) );
-         }
-         Serial.print( "*" ); ++bcount;
-         if ( (bcount%60) == 0)Serial.println( "" );       
-    }
-  } else if (upload.status == UPLOAD_FILE_END) {
-  
-    if (fsUploadFile) {
-      fsUploadFile.close();
-    }
-    Serial.printf("Uploaded %u bytes\n",upload.totalSize);
-  }
+  loseFS();
+  request->send( 404, "text/plain", "FileNotFound"); 
 }
 
 //--------------------------------------------------------------------------------
-void handleRename() {
+void handleRename( AsyncWebServerRequest *request ) {
 
   String  oldname,newname;
   String  sourcefspath, targetfspath;
   fs::FS  *sourcefs=NULL, *targetfs=NULL;
 
-  
+
   lister.close();
   
-  if ( fsxserver.hasArg("oldname") && fsxserver.hasArg("newname") ) {
+  if ( request->hasParam("oldname")  && request->hasParam("newname") ) {
       
-      oldname    = fsxserver.arg("oldname");
-      newname    = fsxserver.arg("newname");
+      oldname    = request->getParam("oldname")->value();
+      newname    = request->getParam("newname")->value();
 
-      if ( oldname == newname) return fsxserver.send(400, "text/plain", "old and new filename are the same, no rename necessary" );
+      if ( oldname == newname){
+        request->send(400, "text/plain", "old and new filename are the same, no rename necessary" );
+        return;
+      }
 
+      getFS();
+      
       sourcefspath  = oldname.substring( fileoffset( oldname.c_str()) );
       targetfspath  = newname.substring( fileoffset( newname.c_str()) );
 
       sourcefs   = fsfromfile( oldname.c_str() ); 
       targetfs   = fsfromfile( newname.c_str() ); 
 
-      if ( targetfs == NULL || sourcefs == NULL || sourcefs != targetfs) return fsxserver.send(500, "text/plain", "Filesystem name invalid or not the same" );
+      if ( targetfs == NULL || sourcefs == NULL || sourcefs != targetfs){
+        loseFS();
+        request->send(500, "text/plain", "Filesystem name invalid or not the same" );
+        return;
+      }
 
       if ( !targetfs->rename( sourcefspath, targetfspath ) ){
-        return fsxserver.send(500, "text/plain", "Rename of " + oldname + " to " + newname + " failed ");
+        loseFS();
+        request->send(500, "text/plain", "Rename of " + oldname + " to " + newname + " failed ");
+        return;
       }
-  
- 
   }else{
-      return fsxserver.send(500, "text/plain", "Argument oldname and newname are missing");
+      request->send(500, "text/plain", "Argument oldname and newname are missing");
+      return;
   }  
 
-return fsxserver.send(200, "text/plain", "Renamed " + oldname +" to " + newname);
+loseFS();
+
+request->send(200, "text/plain", "Renamed " + oldname +" to " + newname);
 }
 
 //--------------------------------------------------------------------------------
-void handleMove() {
+void handleMultiDelete( AsyncWebServerRequest *request ) {
+
+  String  varname;
+  int     i,filecount;
+  String  path, fspath;
+  fs::FS  *ff;
+
+  getFS(); 
+  lister.close();
+  
+  if ( request->hasParam("filecount", true) ){
+      filecount = atoi( request->getParam("filecount",true)->value().c_str() ) ;
+      Serial.printf("Deleting %d files\n", filecount);
+  }else{
+      loseFS();
+      request->send(500, "text/plain", "Argument filecount is missing");
+      return;
+  }  
+
+  for( i=0; i< filecount; ++i ){
+     varname = "file" + String(i); 
+     path = request->getParam( varname,true)->value();
+
+     ff = fsfromfile( path.c_str() );
+     if ( ff == NULL ){
+      Serial.println("No filesystem found in " + varname + "=" + path);
+      loseFS();
+      request->send(400, "text/plain", "No mounted filesystem in path, full filename required starting with mounted filesystem, either /sd,/littlefs,/spiffs or /ffat");
+      return;
+     } 
+
+     fspath = path.substring( fileoffset( path.c_str()) );
+
+     if (fspath == "/") {
+      loseFS();
+      request->send(500, "text/plain", "/ is not a valid filename");
+      return;
+    }
+    
+    if (!ff->exists(fspath)) {
+      loseFS();
+      request->send(404, "text/plain", path + " Not Found " );
+      return;
+    }
+
+    deltree( ff, fspath.c_str() );       
+  }
+
+loseFS();
+request->send(200, "text/plain", "All files succesfully deleted");
+
+}
+
+//--------------------------------------------------------------------------------
+void handleFileDelete(AsyncWebServerRequest *request) {
+
+  if ( request->params() == 0) {
+    request->send(500, "text/plain", "BAD ARGS for delete");
+    return;
+  }
+
+  AsyncWebParameter* p = request->getParam(0);
+  String path = p->value();
+
+  getFS();
+  lister.close();
+  
+  path = urldecode( path);
+  Serial.println("handleFileDelete: " + path);
+  
+  fs::FS  *ff = fsfromfile( path.c_str() );
+  int     returncode = 200;
+  String  fspath;
+  
+  if ( ff == NULL ){
+      Serial.printf("No filesystem found\n");
+      loseFS();  
+      request->send(400, "text/plain", "No valid filesystem in path, full filename required starting with /sd,/littlefs,/spiffs or /ffat");
+      return;
+  }
+
+  fspath = path.substring( fileoffset( path.c_str()) );
+
+    
+  if (fspath == "/") {
+      loseFS();
+      request->send(500, "text/plain", "/ is not a valid filename");
+      return;
+  }
+  if (!ff->exists(fspath)) {
+    loseFS();
+    request->send(404, "text/plain", "FileNotFound");
+    return;
+  }
+
+  deltree( ff, fspath.c_str() ); 
+
+  loseFS();
+  request->send(200, "text/plain", path  + " succesfully deleted");
+  
+}
+
+//-------------------------------------------------------------------------
+
+void handleMkdir(AsyncWebServerRequest *request){
+
+  if ( request->params() == 0) {
+    request->send(500, "text/plain", "BAD ARGS for mkdir");
+    return;
+  }
+
+  getFS();
+  lister.close();
+ 
+  String path = request->getParam("subdir")->value();
+
+  path = urldecode( path);
+  Serial.println("handleMkdir: " + path);
+  
+  fs::FS  *ff = fsfromfile( path.c_str() );
+  String  fspath;
+
+  if ( ff == NULL ){
+      loseFS();
+      Serial.printf("No filesystem found\n");
+      request->send(400, "text/plain", "No valid mounted filesystem in path, full filename required starting with /sd,/littlefs,/spiffs or /ffat");
+      return;
+  }
+
+  fspath = path.substring( fileoffset( path.c_str()) );
+  if (fspath == "/") {
+    loseFS();
+    request->send(400, "text/plain", "/ is not a valid filename");
+    return;
+  }
+
+  makepath ( *ff, fspath );  
+  if ( ! ff->mkdir( fspath ) ){
+    loseFS();
+    request->send(400, "text/plain", "failed to create subdirectory " + path );       
+    return;
+  }
+
+  loseFS();
+  request->send(200, "text/plain", "Directory " + path + " succesfully created");
+
+}
+//------------------------------------------------------------------------------------
+void handleMove(AsyncWebServerRequest *request) {
 
   String  varname;
   int     i,filecount;
@@ -300,32 +411,40 @@ void handleMove() {
   bool    removesource, docopy;
   fs::FS  *sourcefs=NULL, *targetfs=NULL;
 
-  
+  getFS();
   lister.close();
   
-  if ( fsxserver.hasArg("filecount") && fsxserver.hasArg("targetdirectory") && fsxserver.hasArg("removesource") ){
+  if ( request->hasParam("filecount", true) && request->hasParam("targetdirectory",true) && request->hasParam("removesource",true) ){
       
-      filecount    = atoi( fsxserver.arg("filecount").c_str() ) ;
-      targetdir    = fsxserver.arg("targetdirectory");
+      filecount    = atoi( request->getParam("filecount",true)->value().c_str() ) ;
+      targetdir    = request->getParam("targetdirectory",true)->value();
       targetfs     = fsfromfile( targetdir.c_str() );
-      removesource = (bool) atoi(fsxserver.arg("removesource").c_str());
-      if ( targetfs == NULL ) return fsxserver.send(500, "text/plain", "No such target directory, filesystem not found" );
- 
+      removesource = (bool) atoi(request->getParam("removesource",true)->value().c_str());
+      if ( targetfs == NULL ) {
+        loseFS();       
+        request->send(500, "text/plain", "No such target directory, filesystem not found" );
+        return;
+      }
+      
+  
       Serial.printf( "%s %d file%s to %s\n", removesource?"Moving":"Copying", filecount,(filecount == 1)?"":"s", targetdir.c_str());
   }else{
-      return fsxserver.send(500, "text/plain", "Argument filecount, targetdiretory and removesource are missing");
+      loseFS();       
+      return request->send(500, "text/plain", "Argument filecount, targetdiretory and removesource are missing");
   }  
 
   for( i=0; i< filecount; ++i ){
      varname = "file" + String(i); 
      
-     sourcepath = fsxserver.arg(varname);
+     sourcepath = request->getParam( varname,true)->value();
      
      sourcefs = fsfromfile( sourcepath.c_str() );
       
      if ( sourcefs == NULL ){
       Serial.println("No filesystem found in " + varname + "=" + sourcepath);
-      return fsxserver.send(400, "text/plain", "No mounted filesystem in path, full filename required starting with mounted filesystem, either /sd,/littlefs,/spiffs or /ffat");
+        loseFS();
+        request->send(400, "text/plain", "No mounted filesystem in path, full filename required starting with mounted filesystem, either /sd,/littlefs,/spiffs or /ffat");
+      return;
      } 
 
      maketargetpath( sourcepath, targetdir, targetpath );
@@ -337,267 +456,147 @@ void handleMove() {
      sourcefspath  = sourcepath.substring( fileoffset( sourcepath.c_str()) );
      targetfspath  = targetpath.substring( fileoffset( targetpath.c_str()) );
 
-     if ( sourceintarget( sourcepath, targetpath ) ){     
-        return fsxserver.send(400, "text/plain", "Cannot pretzel source in target path");      
+     if ( sourceintarget( sourcepath, targetpath ) ){  
+        loseFS();
+        request->send(400, "text/plain", "Cannot pretzel source in target path");      
+        return;
      }
       
      if ( docopy ){
         int result;
         if ( result = copytree( sourcefs, sourcefspath, targetfs, targetfspath) ){
-          return fsxserver.send(500, "text/plain", "Copy of " + sourcepath + " to " + targetpath + " failed " + FPSTR( cperror[ result ] ) );
+          loseFS();
+          request->send(500, "text/plain", "Copy of " + sourcepath + " to " + targetpath + " failed " + FPSTR( cperror[ result ] ) );
+          return;
         }
      }else{
         makepath ( *targetfs, targetfspath );
         if ( !targetfs->rename( sourcefspath, targetfspath ) ){
-          return fsxserver.send(500, "text/plain", "Move of " + sourcepath + " to " + targetpath + " failed ");
+          loseFS();
+          request->send(500, "text/plain", "Move of " + sourcepath + " to " + targetpath + " failed ");
+          return;
         }
+        esp_task_wdt_reset();
      }
 
      if ( docopy && removesource ){
         deltree( sourcefs, sourcefspath.c_str() );
      }
-
-
-    if ( removesource && docopy )deltree( sourcefs, sourcefspath.c_str() );
            
   }
- 
-fsxserver.send(200, "text/plain", "All files succesfully deleted");
+loseFS();
+request->send(200, "text/plain", "All files succesfully moved");
 
 }
-//--------------------------------------------------------------------------------
-void handleMultiDelete() {
 
-  String  varname;
-  int     i,filecount;
-  String  path, fspath;
-  fs::FS  *ff;
 
-  
-  lister.close();
-  
-  if ( fsxserver.hasArg("filecount") ){
-      filecount = atoi( fsxserver.arg("filecount").c_str() ) ;
-      Serial.printf("Deleting %d files\n", filecount);
+//----------------------------------------------------------------------------
+void send_logo( AsyncWebServerRequest *request ){
+  if(!logo.open("/favicon.ico") ){
+    request->send(503, "text/plain", "Error while listing logo" );
   }else{
-      return fsxserver.send(500, "text/plain", "Argument filecount is missing");
+    Serial.printf("Streaming logo, size = %d\n", logo.size());
+    request->send( logo, "image/x-icon", logo.size() );
   }  
-
-  for( i=0; i< filecount; ++i ){
-     varname = "file" + String(i); 
-     path = fsxserver.arg(varname);
-
-     ff = fsfromfile( path.c_str() );
-     if ( ff == NULL ){
-      Serial.println("No filesystem found in " + varname + "=" + path);
-      return fsxserver.send(400, "text/plain", "No mounted filesystem in path, full filename required starting with mounted filesystem, either /sd,/littlefs,/spiffs or /ffat");
-     } 
-
-     fspath = path.substring( fileoffset( path.c_str()) );
-
-     if (fspath == "/") {
-      return fsxserver.send(500, "text/plain", "/ is not a valid filename");
-    }
-    if (!ff->exists(fspath)) {
-      return fsxserver.send(404, "text/plain", path + " Not Found " );
-    }
-
-    deltree( ff, fspath.c_str() );       
-  }
- 
-fsxserver.send(200, "text/plain", "All files succesfully deleted");
-
 }
-//--------------------------------------------------------------------------------
-void handleFileDelete() {
+//----------------------------------------------------------------------------
+void showUploadform(AsyncWebServerRequest *request) {
 
-  if (fsxserver.args() == 0) {
-    return fsxserver.send(500, "text/plain", "BAD ARGS for delete");
+  if( ! uploadform.open() ){
+    request->send(503, "text/plain", "Error while listing uploadform" );
+  }else{
+    request->send( uploadform, "text/html", uploadform.size() );
   }
-  String path = fsxserver.arg(0);
-
-
-  lister.close();
-  
-//-----
-  path = urldecode( path);
-  Serial.println("handleFileDelete: " + path);
-  
-  fs::FS  *ff = fsfromfile( path.c_str() );
-  int     returncode = 200;
-  String  fspath;
-  
-  if ( ff == NULL ){
-      Serial.printf("No filesystem found\n");
-      return fsxserver.send(400, "text/plain", "No valid filesystem in path, full filename required starting with /sd,/littlefs,/spiffs or /ffat");
-  }
-
-  fspath = path.substring( fileoffset( path.c_str()) );
-
-    
-  if (fspath == "/") {
-      return fsxserver.send(500, "text/plain", "/ is not a valid filename");
-  }
-  if (!ff->exists(fspath)) {
-    return fsxserver.send(404, "text/plain", "FileNotFound");
-  }
-
-  deltree( ff, fspath.c_str() ); 
-
-  fsxserver.send(200, "text/plain", path  + " succesfully deleted");
-  path = String();
 }
+
 //---------------------------------------------------------------------------
-void handleMkdir(){
-  if (fsxserver.args() == 0) {
-    return fsxserver.send(500, "text/plain", "BAD ARGS for delete");
-  }
+
+void handleFileUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+ 
+  static File fsUploadFile;
+  String      fspath;
+  static int  bcount, bmultiplier;
   
-  lister.close();
-  
-  String path = fsxserver.arg("subdir");
+  if(!index){
 
+        getFS();
+                
+        Serial.printf("UploadStart: %s\n", filename.c_str());
+        lister.close();
 
-  path = urldecode( path);
-  Serial.println("handleMkdir: " + path);
-  
-  fs::FS  *ff = fsfromfile( path.c_str() );
-  String  fspath;
-
-  if ( ff == NULL ){
-      Serial.printf("No filesystem found\n");
-      return fsxserver.send(400, "text/plain", "No valid mounted filesystem in path, full filename required starting with /sd,/littlefs,/spiffs or /ffat");
-  }
-
-  fspath = path.substring( fileoffset( path.c_str()) );
-  if (fspath == "/") {
-    return fsxserver.send(400, "text/plain", "/ is not a valid filename");
-  }
-
-  makepath ( *ff, fspath );  
-  if ( ! ff->mkdir( fspath ) ){
-    return fsxserver.send(400, "text/plain", "failed to create subdirectory " + path );       
-  }
-  
-  fsxserver.send(200, "text/plain", "Directory " + path + " succesfully created");
-}
-
-//----------------------------------------------------------------------------
-void handleFileList() {
-
-  if( ! lister.open() ) fsxserver.send(500, "txt/plain", "Error while listing" );
-
-  Serial.printf("Streaming lister, size = %d\n", lister.size());
-  fsxserver.streamFile( lister, "application/json" );
-  //lister.close();
-
-}
-//----------------------------------------------------------------------------
-void handleRoot() {
-
-  if( ! directory.open() ) fsxserver.send(500, "txt/plain", "Error while sending directory.html" );
-
-  Serial.printf("Streaming directory, size = %d\n", directory.size());
-  fsxserver.streamFile( directory, "text/html" );
-
-}
-//----------------------------------------------------------------------------
-void handleSettings(){
-   struct appconfig z = settings;
-    
-   if ( fsxserver.hasArg("portland") ){
-      int pl = atoi( fsxserver.arg("portland").c_str() ) ;
-      if ( pl != 0 && pl != 1 ){ fsxserver.send(400, "txt/plain", "portland can only be 0 or 1" ); return;}
-      z.portland = pl;
-   }
-
-   if ( fsxserver.hasArg("pauseseconds") ){
-      z.pauseseconds = atoi( fsxserver.arg("pauseseconds").c_str() ) ;
-      if ( z.pauseseconds < 0 ) {fsxserver.send(400, "txt/plain", "pauseseconds must be greater than 0" ); return;}
-   }
-
-   if ( fsxserver.hasArg("adapt_rotation") ){
-      int ar = atoi( fsxserver.arg("adapt_rotation").c_str() ) ;
-      if ( ar != 0 && ar != 1 ) {fsxserver.send(400, "txt/plain", "adapt_rotation can only be 0 or 1" );return;}
-      z.adapt_rotation = ar;
-   }
-
-   if ( fsxserver.hasArg("portrait") ){
-      z.portrait = atoi( fsxserver.arg("portrait").c_str() ) ;
-      if ( z.portrait != 0 && z.portrait != 2 ) {fsxserver.send(400, "txt/plain", "portrait can only be 0 or 2" );return;}
-   }
-
-   if ( fsxserver.hasArg("landscape") ){
-      z.landscape = atoi( fsxserver.arg("landscape").c_str() ) ;
-      if ( z.landscape != 1 && z.landscape != 3 ) {fsxserver.send(400, "txt/plain", "landscape can only be 1 or 3" );return;}
-   }
-   
-fsxserver.send(200, "txt/plain", "ok" );
-settings = z;
-write_config();
-
-}
-//----------------------------------------------------------------------------
-void send_logo(){
-  if( ! logo.open("/favicon.ico") ) {
-      handleFileRead( "/favicon.ico");    
-  } else{
-    Serial.printf("Streaming logo, size = %d\n", settingsform.size());
-    fsxserver.streamFile( logo, "image/x-icon" );
-  }
-  
-}
-//----------------------------------------------------------------------------
-void send_settings() {
-  if( ! settingsform.open("/settings.html") ) {
-      handleFileRead( "/settings.html");    
-  } else{
-    Serial.printf("Streaming settings, size = %d\n", settingsform.size());
-    fsxserver.streamFile( settingsform, "text/html" );
-  }
-}
-//----------------------------------------------------------------------------
-void showUploadform() {
-
-  if( ! uploadform.open() ) fsxserver.send(500, "txt/plain", "Error while listing uploadform" );
-
-  Serial.printf("Streaming uploadform, size = %d\n", uploadform.size());
-  fsxserver.streamFile( uploadform, "text/html" );
-
-}
-
-//-------------------------------------------------------------------------
-
-void listrec(const char *basepath)
-{
-    char path[512];
-    struct dirent *dp;
-    DIR *dir = opendir(basepath);
-
-    // Unable to open directory stream
-    if (!dir){
-        Serial.printf( "%s is not a directory. Cannot list.\n", basepath);
-        return;
-    }
-    
-    while ((dp = readdir(dir)) != NULL)
-    {
+        String path = filename;
+        if (!path.startsWith("/")) {
+          path = "/" + path;
+        }
         
-            Serial.printf("%s/%s\n", basepath, dp->d_name);
+        Serial.print("handleFileUpload Name: "); 
+        Serial.println(path);
+    
+        fs::FS  *ff = fsfromfile( path.c_str() );
+        
+        if ( ff == NULL ){
+          ff = fsdlist.back().f;
+          //flash filesystems added last to fsdlist, due ffat bug
+          path = fsdlist.back().fsmount + path;
+          Serial.printf("Upload fallen back to filesystem %s\n", fsdlist.back().fsname ); 
+        }
+       
+        fspath = path.substring( fileoffset( path.c_str()) );
+        
+        if (fspath == "/") {
+          loseFS();
+          request->send(500, "text/plain", "/ is not a valid filename");
+          return;
+        }
+         
+        Serial.printf( "Making all directories for %s on %s\n",  fspath.c_str(), nameoffs( ff ) );
+        Serial.println( "Length of filename " + fspath + " " + String( fspath.length()) );
+            
+        makepath ( *ff, fspath );
+        bcount=0; bmultiplier = 1;
+        
+        fsUploadFile = ff->open(fspath, "w");
+        if ( !fsUploadFile  ){
+              loseFS();
+              Serial.println("Error opening file " + fspath + " " + String (strerror(errno)) );
+              request->send(400, "text/plain", String("Error opening ") + fspath + String(" ") + String ( strerror(errno) ) );
+              return;
+        }
+  }
+  int olderrno = errno;
+  if (fsUploadFile) {
+      if ( fsUploadFile.write( data, len) < len ){
+           fsUploadFile.close();
+           if ( olderrno != errno ){
+            loseFS();
+            request->send(500, "text/plain", "Error during write : " + String ( strerror(errno) ) );
+            Serial.println("Error writing file " +fspath + " " + String (strerror(errno)) );
+            return;
+           }
+      }
+      esp_task_wdt_reset();
+      bcount +=len;
+      while ( bcount > (bmultiplier * 4096) ){ 
+        Serial.print("*");
+        if ( (bmultiplier%60) == 0) Serial.println("");
+        bmultiplier++;
+      }
+      
+  }
 
-            if ( dp->d_type == DT_DIR ){
-              // Construct new path from our base path
-              strcpy(path, basepath);
-              strcat(path, "/");
-              strcat(path, dp->d_name);
-  
-              listrec(path);
-            }    
+  if ( final ){
+    if (fsUploadFile) {
+      fsUploadFile.close();        
     }
+    loseFS();
 
-    closedir(dir);
+    Serial.printf("Uploaded file of %u bytes\n", bcount);
+  }
+  
 }
-void send_json_status()
+
+//---------------------------------------------------------------------
+void send_json_status(AsyncWebServerRequest *request)
 {
  
 char uptime[32];
@@ -658,117 +657,169 @@ sprintf( uptime, "%d %02d:%02d:%02d", updays, uphr, upminute,upsec);
    
   output += "}" ;
     
-  fsxserver.send(200, "application/json;charset=UTF-8", output);
+  request->send(200, "application/json;charset=UTF-8", output);
   free( stmp);
 }
+
+//----------------------------------------------------------------------------
+void handleRoot(AsyncWebServerRequest *request) {
+
+  if( ! directory.open() ){
+    request->send(502, "txt/plain", "Error while sending directory.html" );
+  }else{
+    request->send( directory, "text/html", directory.size() );
+  }
+}
+
+//----------------------------------------------------------------------------
+void handleFileList( AsyncWebServerRequest *request ) {
+
+  
+  if( ! lister.open() ) {
+    request->send(500, "txt/plain", "Error while listing" );
+  }else{
+    request->send( lister, "text/html", lister.size() );
+  }
+}
+
+//---------------------------------------------------------------------------------------
+
+void send_settings( AsyncWebServerRequest *request ) {
+  
+  if( ! settingsform.open() ){
+    request->send(503, "text/plain", "Error while opening settingsform" );
+  }else{
+    request->send( settingsform, "text/html", settingsform.size() );
+  }
+}
+//----------------------------------------------------------------------------
+void handleSettings(AsyncWebServerRequest *request){
+   struct appconfig z = settings;
+   AsyncWebParameter* p;
+   
+   if ( request->hasParam("portland", true) ){
+       int pl = atoi( request->getParam("portland",true)->value().c_str() ) ;
+       if ( pl != 0 && pl != 1 ){ request->send(400, "txt/plain", "portland can only be 0 or 1" ); return;}
+       z.portland = pl;
+   }
+
+   if ( request->hasParam("pauseseconds",true) ){
+      z.pauseseconds = atoi( request->getParam("adapt_rotation",true)->value().c_str() ) ;      //p = request->getParam("pauseseconds" );
+      if ( z.pauseseconds < 0 ) {request->send(400, "txt/plain", "pauseseconds must be greater than 0" ); return;}
+   }
+
+   if ( request->hasParam("adapt_rotation",true) ){
+      int ar = atoi( request->getParam("adapt_rotation",true)->value().c_str() ) ;
+      if ( ar != 0 && ar != 1 ) {request->send(400, "txt/plain", "adapt_rotation can only be 0 or 1" );return;}
+      z.adapt_rotation = ar;
+   }
+
+   if ( request->hasParam("portrait",true) ){
+      z.portrait = atoi( request->getParam("portrait",true)->value().c_str() ) ;
+      if ( z.portrait != 0 && z.portrait != 2 ) {request->send(400, "txt/plain", "portrait can only be 0 or 2" );return;}
+   }
+
+   if ( request->hasParam("landscape",true) ){
+      z.landscape = atoi( request->getParam("landscape",true)->value().c_str() ) ;
+      if ( z.landscape != 1 && z.landscape != 3 ) {request->send(400, "txt/plain", "landscape can only be 1 or 3" );return;}
+   }
+   
+request->send(200, "txt/plain", "ok" );
+settings = z;
+getFS();
+write_config();
+loseFS();
+Serial.println("Written new settings");
+}
+//--------------------------------------------------------------------------
+
+void handleUpdate(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+  
+  uint32_t free_space = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+  
+  if (!index){
+  
+    Serial.println("Update");
+
+    getFS();
+    //Update.runAsync(true);
+    //content_len = request->contentLength();
+    // if filename includes spiffs, update the spiffs partition
+    //int cmd = (filename.indexOf("spiffs") > -1) ? U_PART : U_FLASH;
+    if (!Update.begin( free_space )) {
+      Update.printError(Serial);
+    }
+  }
+
+  if (Update.write(data, len) != len) {
+    Update.printError(Serial);
+  }
+  esp_task_wdt_reset();
+
+  if (final) {
+    loseFS();
+    AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "Please wait while the device reboots");
+    response->addHeader("Refresh", "20");  
+    response->addHeader("Location", "/");
+    request->send(response);
+    if (!Update.end(true)){
+      Update.printError(Serial);
+    } else {
+      Serial.println("\nUpdate complete");
+      Serial.flush();
+      delay(100);
+      ESP.restart();
+    }
+  }
+}
+//---------------------------------------------------------------------------------------
+void printProgress(size_t progress, size_t size) {
+  size_t percent = (progress*1000)/size;
+  if ( (percent%100)  == 0 )Serial.printf(" %u%%\r", percent/10);
+}
+
 //---------------------------------------------------------------------------------------
 void FSXServer(void *param){
 
-  fsxserver.on("/", []() {
-    handleRoot();
-  });
+  fsxserver.on("/", handleRoot);
   
-  fsxserver.on("/upload", HTTP_GET, []() {
-    showUploadform();
-  });
-
-  fsxserver.on("/upload", HTTP_POST, [](){ fsxserver.send(200, "text/html", uploadpage); }, handleFileUpload);
-  
-  //move
-  fsxserver.on("/move", HTTP_POST, handleMove);
-  //rename
-  fsxserver.on("/rename", HTTP_GET, handleRename);
-    
-  //list directory
   fsxserver.on("/list", HTTP_GET, handleFileList);
+  fsxserver.on("/move", HTTP_POST, handleMove); 
+  fsxserver.on("/rename", HTTP_GET, handleRename);
   
-  //mkdir
   fsxserver.on("/mkdir", HTTP_GET, handleMkdir);
-  
-  //delete file
   fsxserver.on("/delete", HTTP_GET, handleFileDelete);
-  
-  //delete multiple filesfile
   fsxserver.on("/delete", HTTP_POST, handleMultiDelete);
+  
+  fsxserver.on("/upload", HTTP_GET, showUploadform);
+  fsxserver.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request){ request->send(200, "text/html", uploadpage); }, handleFileUpload);
 
-  fsxserver.on("/reset", HTTP_GET, []() {
-        fsxserver.send(200, "text/plain", "Doej!");
+  fsxserver.on("/settings", HTTP_GET, send_settings);
+  fsxserver.on("/settings", HTTP_POST, handleSettings);
+  
+  fsxserver.on("/status", HTTP_GET, send_json_status );
+  fsxserver.on("/favicon.ico", send_logo );
+
+  fsxserver.onNotFound( handleFileRead );
+
+  fsxserver.on("/reset", HTTP_GET, []( AsyncWebServerRequest *request ) {
+        request->send(200, "text/plain", "Doej!");
         delay(20);
         ESP.restart();
   });
 
-   fsxserver.on("/update", HTTP_GET, []() {
-        fsxserver.send(200, "text/html", updateform );
-   });
-        
-   fsxserver.on("/update", HTTP_POST, []() {
-      fsxserver.sendHeader("Connection", "close");
-      fsxserver.send(200, "text/plain", (Update.hasError()) ? "Update FAILED" : "Update successful");
-      ESP.restart();
-    }, []() {
-      HTTPUpload& upload = fsxserver.upload();
-      if (upload.status == UPLOAD_FILE_START) {
-       
-         while ( xSemaphoreTake( updateSemaphore, 1) != pdTRUE ) delay(5) ;
-         Serial.printf("update took updateSemaphore\n");
-         disableCore0WDT(); //to prevent WDT resets during update
-          
-        Serial.setDebugOutput(true);
-        Serial.printf("Update: %s\n", upload.filename.c_str());
-        if (!Update.begin()) { //start with max available size
-          Update.printError(Serial);
-        }
-      } else if (upload.status == UPLOAD_FILE_WRITE) {
-        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-          Update.printError(Serial);
-        }
-      } else if (upload.status == UPLOAD_FILE_END) {
-        enableCore0WDT(); 
-        xSemaphoreGive( updateSemaphore);
-         Serial.printf("update gave updateSemaphore\n");
-
-        if (Update.end(true)) { //true to set the size to the current progress
-          Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-        } else {
-          Update.printError(Serial);
-        }
-        Serial.setDebugOutput(false);
-      } else {
-        Serial.printf("Update Failed Unexpectedly (likely broken connection): status=%d\n", upload.status);
-      }
-    });
-
-
-
-  fsxserver.on("/status", HTTP_GET, []() {
-         send_json_status();
-   });
-
-  fsxserver.on("/settings", HTTP_GET, []() {
-         send_settings();
-   });
-
-  fsxserver.on("/settings", HTTP_POST, []() {
-         handleSettings();
-   });
-
-   fsxserver.on("/favicon.ico", HTTP_GET, []() {
-         send_logo();
-   });
-
-  
-  fsxserver.onNotFound([]() {
-    if (!handleFileRead(fsxserver.uri())) {
-      fsxserver.send(404, "text/plain", "FileNotFound");
-    }
-  });
-
+  fsxserver.on("/update", HTTP_GET, []( AsyncWebServerRequest *request ) {
+        request->send( 200, "text/html", updateform );
+  });  
+  fsxserver.on("/update", HTTP_POST, [](AsyncWebServerRequest *request){ request->send( 200, "text/html",updateform); }, handleUpdate);
+ 
   fsxserver.begin();
   Serial.printf( "sd mmc totalbytes: %llu, used bytes %llu\n", SD_MMC.totalBytes(), SD_MMC.usedBytes() );
-
+  Update.onProgress(printProgress);
+  
   while(1){
-    fsxserver.handleClient();
-    delay(1);
+ //   fsxserver.handleClient();
+    delay(100);
   }
   
 }
@@ -776,7 +827,7 @@ void FSXServer(void *param){
 //----------------------------------------------------------------------------
 void stopFSXServer(){
   
-  fsxserver.stop();
+  fsxserver.end();
   vTaskDelete( FSXServerTask ); 
 
   return;

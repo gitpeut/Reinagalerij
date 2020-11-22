@@ -114,7 +114,7 @@ void showpicture( fs::FS &fs, const char *filename){
 
  if ( xo || yo)tft.fillScreen(TFT_BLACK);
   
- Serial.printf("%s Width = %d,height %d xo = %d, yo = %d\n",filename, w/scale,h/scale, xo,yo); 
+ //Serial.printf("%s Width = %d,height %d xo = %d, yo = %d\n",filename, w/scale,h/scale, xo,yo); 
 
  // Draw the image, top left at xo, yo
  //TJpgDec.drawFsJpg(xo, yo, filename);

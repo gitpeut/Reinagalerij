@@ -1,10 +1,11 @@
 #include "fsx.h"
   
 
-const char* PROGMEM esphostname = "reinagalerij";
+const char* PROGMEM esphostname = "reinASgalerij";
 const char* PROGMEM sourcefile = __FILE__;
 const char* PROGMEM compile_time = __DATE__ " " __TIME__;
 
+SemaphoreHandle_t fsSemaphore;
 
 //---------------------------------------------------------------------------
 int make_dirtree( fs::FS &ff, String path ){
@@ -74,6 +75,7 @@ void setup(void) {
   tftSemaphore = xSemaphoreCreateMutex();;
   xSemaphoreTake(tftSemaphore, 10);
   xSemaphoreGive(tftSemaphore);
+
   
   mount_fs(); 
   startTFT();

@@ -115,6 +115,7 @@ void listFS::close(){
 
 size_t listFS::readBytes( uint8_t *buffer, size_t length = 1 ){
   size_t copylength;
+  //Serial.println("readBytes");
 
   if( readpointer == NULL ) return 0;
   
@@ -130,13 +131,16 @@ size_t listFS::readBytes( uint8_t *buffer, size_t length = 1 ){
   
   return copylength;
 }   
-
+//-------------------------------------------------------------
 int listFS::read(){ 
+  //Serial.println("read");
   if ( readpointer < endpsbuffer ){
     return *readpointer++; 
   }
   return( -1 );  
 }
+//-------------------------------------------------------------
+
 int listFS::peek(){
   if ( readpointer < endpsbuffer ){
     return *readpointer; 
@@ -193,6 +197,7 @@ while ( (entry = dir.openNextFile()) ){
             output = "\"type\": 3, \"size\": " + String( entry.size() ) + "}" ; 
             addtos ( s, output.c_str() );                                  
          } 
+         esp_task_wdt_reset();
          entry.close();
 }
 
@@ -207,7 +212,8 @@ void listFS::allfs2json( char **s ){
   String output;
 
   refresh_fsd_usage();
-  
+  getFS();
+        
   output = "{\"name\" : \"" + String(esphostname) + "\", \"type\": 0,\"filesystems\" : \n   [";
   addtos ( s, output.c_str() );
   
@@ -251,7 +257,7 @@ void listFS::allfs2json( char **s ){
       
   }
   addtos ( s, "]}\n" );
-      
+  xSemaphoreGive(updateSemaphore);    
 }
 
   
